@@ -1,0 +1,14 @@
+SELECT WH.name AS "Наименование продукции",
+OC.quantity AS "Количество",
+WH.price AS "Цена за единицу",
+(OC.quantity * WH.price) AS "Сумма по заказу",
+(OC.quantity * (SELECT SUM(C.quantity * C.cost)
+   FROM public.specification S
+   JOIN public.composition C ON S.specificationnumber = C.specificationid
+   WHERE S.product = OC.product
+)) AS "Стоимость материалов"
+FROM public.orders O
+JOIN public.ordercomposition OC ON O.ordernumber = OC.ordernumber
+JOIN public.warehouse WH ON OC.product = WH.nomenclaturecode
+JOIN public.counterparty CP ON O.customerid = CP.counterpartynumber
+WHERE O.ordernumber = 1;
