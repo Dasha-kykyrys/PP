@@ -1,4 +1,6 @@
-SELECT WH.name AS "Наименование продукции",
+SELECT 
+O.ordernumber AS "Номер заказа",
+WH.name AS "Наименование продукции",
 OC.quantity AS "Количество",
 WH.price AS "Цена за единицу",
 (OC.quantity * WH.price) AS "Сумма по заказу",
