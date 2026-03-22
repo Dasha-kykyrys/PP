@@ -4,9 +4,10 @@ WH.name AS "Наименование продукции",
 OC.quantity AS "Количество",
 WH.price AS "Цена за единицу",
 (OC.quantity * WH.price) AS "Сумма по заказу",
-(OC.quantity * (SELECT SUM(C.quantity * C.cost)
+(OC.quantity * (SELECT SUM(C.quantity * WHM.cost)
    FROM public.specification S
    JOIN public.composition C ON S.specificationnumber = C.specificationid
+   JOIN public.warehouse WHM ON C.material = WHM.nomenclaturecode
    WHERE S.product = OC.product
 )) AS "Стоимость материалов"
 FROM public.orders O
