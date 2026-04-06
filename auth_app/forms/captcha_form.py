@@ -10,7 +10,6 @@ class CaptchaPuzzle(tk.Frame):
         self.buttons = []
         self.orders = [0, 1, 2, 3]
 
-        # Загрузка изображений
         for i in range(1, 5):
             self.images.append(ImageTk.PhotoImage(Image.open(f"images/{i}.png").resize((100, 100))))
 
@@ -21,7 +20,6 @@ class CaptchaPuzzle(tk.Frame):
     def create_widgets(self):
         random.shuffle(self.orders)
 
-        # Присваивание изображений по перемешанному порядку
         for i, (row, col) in enumerate([(0, 0), (0, 1), (1, 0), (1, 1)]):
             image_button = tk.Button(self, image=self.images[self.orders[i]],
                             command=lambda idx=i: self.on_click(idx))

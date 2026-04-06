@@ -1,14 +1,19 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
-from database.db_manager import DatabaseManager
+from requests.user_requests import UserRequests
+from requests.auth_requests import AuthRequests
 from forms.admin_form import AdminForm
+from forms.user_form import UserForm
 from forms.captcha_form import CaptchaPuzzle
+from utils.window_utils import center_window
 
 class LoginForm:
     """Форма авторизации пользователей с капчей"""
 
-    def __init__(self, db_manager: DatabaseManager):
-        self.db = db_manager
+    def __init__(self):
+        self.user_dao = UserRequests()
+        self.auth_dao = AuthRequests()
+
         self.root = tk.Tk()
         self.root.title("Авторизация")
         width = 400
@@ -16,15 +21,13 @@ class LoginForm:
         self.root.minsize(width, height)
 
         self.max_attempts = 3
-        self.failed_attempts_password = 0
-        self.failed_attempts_captcha = 0
 
         self.root.grid_columnconfigure(0, weight=1)
         self.root.grid_rowconfigure(0, weight=1)
 
         self.create_widgets()
         self.set_tab()
-        self.center_window(self.root, width, height)
+        center_window(self.root, width, height)
 
     def create_widgets(self):
         """Создание виджетов формы"""
@@ -32,7 +35,6 @@ class LoginForm:
         main_frame.grid(column=0, row=0, sticky="nsew")
         main_frame.grid_columnconfigure(0, weight=1)
 
-        # Заголовок
         title_label = ttk.Label(
             main_frame,
             text="Авторизация",
@@ -40,7 +42,6 @@ class LoginForm:
         )
         title_label.grid(column=0, row=0, pady=(0, 20))
 
-        # Кнопка входа
         self.enter_button = ttk.Button(
             main_frame,
             text="Войти",
@@ -69,62 +70,54 @@ class LoginForm:
         self.captcha = CaptchaPuzzle(main_frame)
         self.captcha.grid(column=0, row=3, pady=(5, 0))
 
-    def set_tab(self):
-        """Настройка последовательного перехода фокуса по Tab"""
-        self.login_entry.focus_set()
-        self.password_entry.bind("<Tab>", lambda e: self.enter_button.focus_set())
-        self.enter_button.bind("<Tab>", lambda e: self.login_entry.focus_set())
-
     def handle_login(self):
         """Обработка попытки входа"""
         login = self.login_entry.get()
         password = self.password_entry.get()
 
         if login == "" or password == "":
-            messagebox.showinfo(
+            messagebox.showerror(
                 "Ошибка ввода",
                 "Все поля должны быть заполнены!!!"
             )
             return
 
-        # Поиск наличия пользователя
-        if self.db.user_serch(login):
-            # Проверка статуса пользователя
-            if self.db.get_user_status(login):
-                self.block_user_message(login)
+        if self.auth_dao.user_search(login):
+            failed_attempts = self.auth_dao.get_failed_attempts(login)
+            if self.auth_dao.get_user_status(login):
+                self.block_user_message()
                 return
-            # Проверка связки пароль и логин
-            if self.db.authenticate(login, password):
-                # Проверка капчи
+            if self.auth_dao.authenticate(login, password):
                 if self.captcha.check_captcha():
                     messagebox.showinfo(
                         "Авторизация",
                         "Вы успешно авторизовались"
                     )
-                    # Проверка роли пользователя
-                    if self.db.get_user_role(login):
+                    if self.auth_dao.get_user_role(login):
                         self.root.destroy()
-                        admin_form = AdminForm(self.db)
+                        admin_form = AdminForm(self.user_dao, self.auth_dao)
                         admin_form.run()
                     else:
                         self.root.destroy()
+                        user_form = UserForm()
+                        user_form.run()
                 else:
-                    self.failed_attempts_captcha += 1
-                    # Проверка кол-во ошибок в капче
-                    if self.failed_attempts_captcha > 2:
-                        self.block_user_message(login)
-                        self.db.block_user(login)
+                    failed_attempts += 1
+                    self.auth_dao.edit_failed_attempts(login, failed_attempts)
+                    if failed_attempts == self.max_attempts:
+                        self.block_user_message()
+                        self.auth_dao.block_user(login)
                         return
-                    messagebox.showinfo(
+                    messagebox.showerror(
                         "Ошибка проверки",
                         "Картинка собрана неверно."
                     )
             else:
-                self.failed_attempts_password += 1
-                # Проверка кол-во ошибок в пароле
-                if self.failed_attempts_password > 2:
-                     self.block_user_message(login)
-                     self.db.block_user(login)
+                failed_attempts += 1
+                self.auth_dao.edit_failed_attempts(login, failed_attempts)
+                if failed_attempts == self.max_attempts:
+                     self.block_user_message()
+                     self.auth_dao.block_user(login)
                      return
                 self.error_authorization_message()
         else:
@@ -135,32 +128,25 @@ class LoginForm:
         """
         Сообщение о неверных данных
         """
-        messagebox.showinfo(
+        messagebox.showerror(
             "Ошибка авторизации",
             "Вы ввели неверный логин или пароль. Пожалуйста проверьте ещё раз введенные данные."
         )
 
-    def block_user_message(self, login:str):
+    def block_user_message(self):
         """
         Сообщение о блокировке
         """
-        messagebox.showinfo(
+        messagebox.showwarning(
             "Блокировка",
             "Вы заблокированы. Обратитесь к администратору"
         )
 
-
-    def center_window(self, window, width, height):
-        """
-        Центрирование окна
-        """
-        screen_width = window.winfo_screenwidth()
-        screen_height = window.winfo_screenheight()
-
-        x = (screen_width // 2) - (width // 2)
-        y = (screen_height // 2) - (height // 2)
-
-        window.geometry(f"{width}x{height}+{x}+{y}")
+    def set_tab(self):
+        """Настройка последовательного перехода фокуса по Tab"""
+        self.login_entry.focus_set()
+        self.password_entry.bind("<Tab>", lambda e: self.enter_button.focus_set())
+        self.enter_button.bind("<Tab>", lambda e: self.login_entry.focus_set())
 
     def run(self):
         """Запуск приложения"""

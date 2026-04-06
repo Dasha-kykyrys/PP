@@ -1,10 +1,7 @@
-from database.db_manager import DatabaseManager
 from forms.login_form import LoginForm
 
 def main():
-    db_manager = DatabaseManager()
-
-    app = LoginForm(db_manager)
+    app = LoginForm()
     app.run()
 
 if __name__ == "__main__":
